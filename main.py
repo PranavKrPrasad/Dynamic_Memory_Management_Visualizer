@@ -1,22 +1,27 @@
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-app = FastAPI(title="Simple VM Simulator API")
+# -----------------------------------------------------
+# FastAPI app
+# -----------------------------------------------------
 
-# --- Pydantic Models for Data Structure ---
+app = FastAPI(title="Dynamic Memory Management Visualizer")
 
 
+# -----------------------------------------------------
+# Data models
+# -----------------------------------------------------
 
 class PageTableEntry(BaseModel):
     """Represents an entry in a process's Page Table."""
     vpn: int
     pfn: Optional[int] = None
     present: bool = False
-    timestamp: int = 0  # Used for both FIFO (arrival) and LRU (last accessed)
+    timestamp: int = 0  # Used for FIFO/LRU
 
 
 class ProcessModel(BaseModel):
@@ -28,7 +33,7 @@ class ProcessModel(BaseModel):
 
 
 class Frame(BaseModel):
-    """Represents a Physical Frame in Main Memory."""
+    """Represents a physical frame in main memory."""
     id: int
     pid: Optional[str] = None
     vpn: Optional[int] = None
@@ -39,7 +44,7 @@ class Frame(BaseModel):
 
 class InitConfig(BaseModel):
     frames: int = 8
-    algorithm: str = "FIFO"
+    algorithm: str = "FIFO"  # FIFO or LRU
 
 
 class AccessRequest(BaseModel):
@@ -47,130 +52,130 @@ class AccessRequest(BaseModel):
     vpn: int
 
 
-# --- Simulator Core Logic ---
-
+# -----------------------------------------------------
+# Simulator core
+# -----------------------------------------------------
 
 class Simulator:
-    """Manages the virtual memory state and replacement logic."""
+    """Virtual memory simulator with FIFO / LRU replacement."""
 
-     def __init__(self):
+    def __init__(self) -> None:
         self.frames: List[Frame] = []
         self.processes: Dict[str, ProcessModel] = {}
-        self.frame_capacity = 0
-        self.algorithm = "FIFO"
-        self.clock = 0
-        self.total_accesses = 0
-        self.page_hits = 0
-        self.page_faults = 0
+        self.frame_capacity: int = 0
+        self.algorithm: str = "FIFO"
+        self.clock: int = 0
+        self.total_accesses: int = 0
+        self.page_hits: int = 0
+        self.page_faults: int = 0
 
-    def init(self, frames: int, algorithm: str):
-        """Initializes or resets the memory state."""
+    # ---------- initialization ----------
+
+    def init(self, frames: int, algorithm: str) -> Dict[str, Any]:
+        """Initialize or reset the simulation."""
         self.frame_capacity = frames
         self.frames = [Frame(id=i) for i in range(frames)]
+        self.processes = {}
         self.algorithm = algorithm.upper()
         self.clock = 0
         self.total_accesses = 0
         self.page_hits = 0
         self.page_faults = 0
-        self.processes = {}
         return self._state_snapshot()
 
-    def create_process(self, pid: str, size: int, color: Optional[str] = None):
-        """Creates a new process and its initial Page Table."""
+    # ---------- process management ----------
+
+    def create_process(self, pid: str, size: int, color: Optional[str]) -> ProcessModel:
         if pid in self.processes:
             raise ValueError("PID already exists")
 
         page_table = [PageTableEntry(vpn=i) for i in range(size)]
-        self.processes[pid] = ProcessModel(
-            pid=pid,
-            size=size,
-            page_table=page_table,
-            color=color,
-        )
-        return self.processes[pid]
+        proc = ProcessModel(pid=pid, size=size, page_table=page_table, color=color)
+        self.processes[pid] = proc
+        return proc
+
+    # ---------- memory access ----------
 
     def access(self, pid: str, vpn: int) -> Dict[str, Any]:
-        """Simulates accessing a virtual page, handling hits and faults."""
+        """Simulate accessing a virtual page."""
         if pid not in self.processes:
             raise ValueError("Unknown pid")
+
         process = self.processes[pid]
         if vpn < 0 or vpn >= process.size:
-            raise ValueError("VPN out of range for process size")
+            raise ValueError("VPN out of range for process")
 
         self.clock += 1
         self.total_accesses += 1
         entry = process.page_table[vpn]
-        event = {"time": self.clock, "pid": pid, "vpn": vpn}
+        event: Dict[str, Any] = {"time": self.clock, "pid": pid, "vpn": vpn}
 
-        # Page Hit
+        # --- Hit ---
         if entry.present and entry.pfn is not None:
             self.page_hits += 1
             pfn = entry.pfn
-            entry.timestamp = self.clock  # LRU metric
+            entry.timestamp = self.clock
             self.frames[pfn].last_accessed = self.clock
             event.update({"result": "hit", "pfn": pfn})
             return event
 
-        # Page Fault
+        # --- Page fault ---
         self.page_faults += 1
 
-        # find free frame
+        # free frame?
         free_index = next((i for i, fr in enumerate(self.frames) if not fr.is_filled), None)
         if free_index is not None:
             self._load_into_frame(pid, vpn, free_index)
             event.update({"result": "loaded", "pfn": free_index})
             return event
 
-        # no free frame → replacement
-        victim = self._select_victim()
-        victim_frame = self.frames[victim]
+        # replacement needed
+        victim_index = self._select_victim()
+        victim_frame = self.frames[victim_index]
 
-        if victim_frame.pid and victim_frame.vpn is not None:
-            vp_entry = self.processes[victim_frame.pid].page_table[victim_frame.vpn]
-            vp_entry.present = False
-            vp_entry.pfn = None
-            vp_entry.timestamp = 0
+        # invalidate victim page
+        if victim_frame.pid is not None and victim_frame.vpn is not None:
+            victim_entry = self.processes[victim_frame.pid].page_table[victim_frame.vpn]
+            victim_entry.present = False
+            victim_entry.pfn = None
+            victim_entry.timestamp = 0
 
-        self._load_into_frame(pid, vpn, victim)
+        self._load_into_frame(pid, vpn, victim_index)
         event.update(
             {
                 "result": "replaced",
-                "pfn": victim,
+                "pfn": victim_index,
                 "evicted": {"pid": victim_frame.pid, "vpn": victim_frame.vpn},
             }
         )
         return event
 
-    def _load_into_frame(self, pid: str, vpn: int, pfn: int):
-        """Loads the given page into the specified physical frame."""
+    # ---------- helpers ----------
+
+    def _load_into_frame(self, pid: str, vpn: int, pfn: int) -> None:
         frame = self.frames[pfn]
         frame.pid = pid
         frame.vpn = vpn
         frame.is_filled = True
         frame.last_accessed = self.clock
-
         if self.algorithm == "FIFO":
             frame.arrival_time = self.clock
 
-        pe = self.processes[pid].page_table[vpn]
-        pe.present = True
-        pe.pfn = pfn
-        pe.timestamp = frame.arrival_time if self.algorithm == "FIFO" else frame.last_accessed
+        entry = self.processes[pid].page_table[vpn]
+        entry.present = True
+        entry.pfn = pfn
+        entry.timestamp = frame.arrival_time if self.algorithm == "FIFO" else frame.last_accessed
 
     def _select_victim(self) -> int:
-        """Selects the frame to be replaced based on the current algorithm."""
-        if self.algorithm == "FIFO":
-            key = lambda f: f.arrival_time
-        elif self.algorithm == "LRU":
+        if self.algorithm == "LRU":
             key = lambda f: f.last_accessed
         else:
             key = lambda f: f.arrival_time
 
-        victim_frame = min(self.frames, key=key)
-        return victim_frame.id
+        victim = min(self.frames, key=key)
+        return victim.id
 
-    def _state_snapshot(self):
-        """Returns a snapshot of the current simulator state for API responses."""
+    def _state_snapshot(self) -> Dict[str, Any]:
         return {
             "frames": [fr.dict() for fr in self.frames],
             "processes": {pid: proc.dict() for pid, proc in self.processes.items()},
@@ -187,57 +192,60 @@ class Simulator:
         }
 
 
+# single global simulator
 sim = Simulator()
 
-# ---------- HTTP API ----------
 
+# -----------------------------------------------------
+# Routes
+# -----------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
-def serve_index():
-    """Serve the frontend HTML so you can open http://localhost:8000/."""
+def serve_index() -> str:
+    """Serve the main HTML page."""
     index_path = Path(__file__).parent / "index.html"
     return index_path.read_text(encoding="utf-8")
 
 
 @app.post("/api/init")
 def api_init(config: InitConfig):
-    """Initializes the simulation with frame count and replacement algorithm."""
     snapshot = sim.init(frames=config.frames, algorithm=config.algorithm)
-    return JSONResponse(content={"status": "ok", "state": snapshot})
+    return JSONResponse({"status": "ok", "state": snapshot})
 
 
 @app.post("/api/process")
-def api_create_process(payload: Dict[str, Any]):
-    """Creates a new virtual process."""
-    pid = payload.get("pid")
+def api_process(payload: Dict[str, Any]):
+    pid = str(payload.get("pid"))
     size = int(payload.get("size", 1))
     color = payload.get("color")
+
     try:
         proc = sim.create_process(pid, size, color)
-        return JSONResponse(content={"status": "ok", "process": proc.dict()})
-    except Exception as e:
-        return JSONResponse(content={"status": "error", "error": str(e)}, status_code=400)
+        return JSONResponse({"status": "ok", "process": proc.dict()})
+    except Exception as exc:
+        return JSONResponse({"status": "error", "error": str(exc)}, status_code=400)
 
 
 @app.post("/api/access")
-def api_access(access: AccessRequest):
-    """Accesses a virtual page and triggers page fault/replacement logic."""
+def api_access(req: AccessRequest):
     try:
-        ev = sim.access(access.pid, access.vpn)
-        return JSONResponse(
-            content={"status": "ok", "event": ev, "state": sim._state_snapshot()}
-        )
-    except Exception as e:
-        return JSONResponse(content={"status": "error", "error": str(e)}, status_code=400)
+        ev = sim.access(req.pid, req.vpn)
+        return JSONResponse({"status": "ok", "event": ev, "state": sim._state_snapshot()})
+    except Exception as exc:
+        return JSONResponse({"status": "error", "error": str(exc)}, status_code=400)
 
 
 @app.get("/api/state")
 def api_state():
-    """Gets the current state of memory, processes, and metrics."""
-    return JSONResponse(content={"status": "ok", "state": sim._state_snapshot()})
+    return JSONResponse({"status": "ok", "state": sim._state_snapshot()})
 
+
+# -----------------------------------------------------
+# Local run
+# -----------------------------------------------------
 
 if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
