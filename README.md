@@ -1,120 +1,181 @@
-🧠 Dynamic Memory Management Visualizer
-📌 Project Overview
+# 🧠 Dynamic Memory Management Visualizer
 
-This project is a Dynamic Memory Management Visualizer built as part of our college curriculum to better understand how memory allocation and deallocation work inside an operating system.
+**Virtual Memory & Paging Simulator (FIFO / LRU)**
 
-Instead of learning these concepts only through theory, this project provides a visual and interactive way to see how memory blocks are allocated, used, and freed in real time.
+An interactive web-based simulator to visualize **virtual memory management**, **page tables**, and **page replacement algorithms** using a modern UI and a FastAPI backend.
 
-🎯 Purpose of the Project
+---
 
-In Operating Systems, concepts like dynamic memory allocation, free memory blocks, and first-fit strategy are often difficult to imagine practically.
-The main goal of this project is to:
+## 📌 Features
 
-Convert theoretical OS concepts into a visual simulation
+* Virtual → Physical address translation
+* Page Table visualization
+* Physical memory frame allocation
+* Page replacement algorithms:
 
-Help students understand how memory is divided and managed
+  * FIFO (First-In First-Out)
+  * LRU (Least Recently Used)
+* Performance metrics:
 
-Show the effect of allocation and deallocation clearly
+  * Page hits
+  * Page faults
+  * Hit ratio
+* Clean, dark-themed interactive UI
 
-Bridge the gap between theory and real-world behavior
+---
 
-⚙️ How the System Works
+## 🧩 Tech Stack
 
-The total memory is represented as a single continuous memory space
+* **Frontend**: HTML, CSS (Tailwind), JavaScript
+* **Backend**: Python, FastAPI
+* **Server**: Uvicorn
+* **Visualization**: DOM-based dynamic rendering
 
-Memory is divided into blocks
+---
 
-Each block can be:
+## 📁 Project Structure
 
-✅ Free
+```
+Dynamic_Memory_Management_Visualizer/
+│
+├── index.html          # Frontend UI
+├── main.py             # FastAPI backend
+├── requirements.txt    # Python dependencies
+├── Dockerfile          # (Optional) Docker support
+├── README.md
+└── .venv/              # Python virtual environment
+```
 
-❌ Allocated (Used)
+---
 
-🔹 Allocation
+## ⚠️ IMPORTANT (Read This First)
 
-When the user enters a block size and process label:
+❌ **Do NOT open `index.html` directly**
+❌ **Do NOT use VS Code Live Server**
 
-The system applies the First-Fit Allocation Algorithm
+✅ This project **must be run via the FastAPI backend**, otherwise fetch errors will occur.
 
-The first available free block large enough is selected
+---
 
-Memory is allocated and shown visually
+## ✅ Step-by-Step: How to Run the Project (Recommended)
 
-🔹 Deallocation
+### 1️⃣ Open Terminal in Project Folder
 
-The user can select an allocated block
+```bash
+cd Dynamic_Memory_Management_Visualizer
+```
 
-That block is freed
+---
 
-The memory layout updates instantly
+### 2️⃣ (Optional but Recommended) Activate Virtual Environment
 
-🔹 Visualization
+#### Windows (PowerShell):
 
-🟢 Green blocks → Allocated memory
+```bash
+.venv\Scripts\activate
+```
 
-⚫ Dark blocks → Free memory
+---
 
-Logs are maintained to show allocation status and actions
+### 3️⃣ Install Required Dependencies
 
-🧩 Technologies Used
-Frontend
+```bash
+python -m pip install -r requirements.txt
+```
 
-HTML – Structure of the interface
+> If you see **“Requirement already satisfied”**, that is **normal**.
 
-CSS – Styling and responsive layout
+---
 
-JavaScript – User interaction and dynamic updates
+### 4️⃣ Start the Backend Server
 
-Backend
+```bash
+python -m uvicorn main:app
+```
 
-Python (FastAPI) – Handles memory logic and API communication
+✅ You should see:
 
-WebSocket – Enables real-time updates between backend and frontend
+```
+Uvicorn running on http://127.0.0.1:8000
+Application startup complete.
+```
 
-💡 Key Features
+---
 
-Interactive memory visualization
+### 5️⃣ Open the Application in Browser
 
-Real-time updates using WebSockets
+Open **ONLY** this URL:
 
-First-Fit memory allocation strategy
+```
+http://127.0.0.1:8000
+```
 
-Allocation and deallocation logs
+🚫 Do **NOT** open `index.html`
+🚫 Do **NOT** use port `5500`
 
-User-friendly and responsive interface
+---
 
-Educational and beginner-friendly design
+## 🧪 Backend Verification (Optional)
 
-📚 Educational Value
+To verify backend is running correctly, open:
 
-This project is especially useful for:
+```
+http://127.0.0.1:8000/docs
+```
 
-Computer Science students
+This opens FastAPI’s Swagger UI.
 
-Learning Operating Systems
+---
 
-Understanding Dynamic Memory Allocation
+## 🛠 Common Issues & Solutions
 
-Visualizing abstract OS concepts easily
+### ❌ “Failed to fetch” / “Unexpected end of JSON input”
 
-It helps students grasp concepts that are usually difficult to imagine by making them visible and interactive.
+**Cause:** Frontend opened without backend
+**Solution:**
+✔ Start backend first
+✔ Open app via `http://127.0.0.1:8000`
 
-🧑‍🤝‍🧑 Team Contribution
+---
 
-This project was developed collaboratively.
-Each member contributed to different aspects such as:
+### ❌ `uvicorn` not recognized
 
-Backend logic
+Use:
 
-Frontend design
+```bash
+python -m uvicorn main:app
+```
 
-Code refactoring
+(Recommended for Windows)
 
-UI improvements
+---
 
-Testing and debugging
+### ❌ Server restarting continuously
 
-✅ Conclusion
+Run without reload:
 
-The Dynamic Memory Management Visualizer successfully demonstrates how memory is allocated and freed in an operating system using an easy-to-understand visual approach.
-It serves as both a learning tool and a practical implementation of OS concepts taught in classrooms.
+```bash
+python -m uvicorn main:app
+```
+
+---
+
+## 🎓 Academic Use
+
+This project is suitable for:
+
+* Operating Systems coursework
+* Memory management demonstrations
+* Paging & page replacement algorithm visualization
+* Mini-project / lab evaluation
+
+---
+
+## 🚀 Future Enhancements
+
+* Add segmentation & virtual memory swapping
+* Add more algorithms (Optimal, Clock)
+* Graph-based memory access timeline
+* Export simulation results
+
+---
