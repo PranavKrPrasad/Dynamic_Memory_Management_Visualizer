@@ -212,6 +212,80 @@
             animation: slideIn 0.3s ease-out;
             max-width: 24rem;
         }
+        /* ===============================
+            ADVANCED MEMORY ANIMATIONS
+           =============================== */
+
+        /* Frame load animation */
+        @keyframes frame-load {
+            0% {
+                transform: scale(0.85);
+                opacity: 0;
+                box-shadow: 0 0 0 rgba(0,255,200,0);
+            }
+            60% {
+                transform: scale(1.05);
+                opacity: 1;
+                box-shadow: 0 0 28px rgba(0,255,200,0.45);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 14px rgba(0,255,200,0.25);
+            }
+        }
+
+        .frame-animate-load {
+            animation: frame-load 450ms ease-out forwards;
+        }
+
+        /* Page fault shake */
+        @keyframes fault-shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        .frame-fault {
+            animation: fault-shake 300ms ease;
+        }
+
+        /* Eviction animation */
+        @keyframes frame-evict {
+            to {
+                transform: translateY(25px) scale(0.9);
+                opacity: 0;
+            }
+        }
+
+        .frame-evict {
+            animation: frame-evict 300ms ease forwards;
+        }
+
+        /* Page table highlight */
+        @keyframes row-highlight {
+            0% { background: rgba(0,255,200,0.05); }
+            50% { background: rgba(0,255,200,0.25); }
+            100% { background: rgba(0,255,200,0.1); }
+        }
+
+        .page-table-active {
+            animation: row-highlight 900ms ease;
+        }
+
+        /* Activity log typing */
+        @keyframes typing {
+            from { width: 0 }
+            to { width: 100% }
+        }
+
+        .log-typing {
+            overflow: hidden;
+            white-space: nowrap;
+            animation: typing 0.9s steps(40, end);
+        }
+
         
         @keyframes slideIn {
             from {
@@ -693,7 +767,7 @@
         const p = document.createElement('p');
         const timestamp = new Date().toLocaleTimeString();
         
-        p.className = `text-sm font-mono log-${type}`;
+        p.className = `text-sm font-mono log-${type} log-typing`;
         p.innerHTML = `<span class="text-muted-foreground opacity-60">[${timestamp}]</span> ${message}`;
         log.prepend(p);
         
@@ -865,11 +939,14 @@
             logActivity(`LOAD ${pid}:VPN${vpn} → PFN${ev.pfn}`, 'fault');
             highlightFrame(ev.pfn, 'miss');
         } else if (ev.result === 'replaced') {
-            logActivity(
-                `REPLACE ${pid}:VPN${vpn} → PFN${ev.pfn} (evicted ${ev.evicted.pid}:VPN${ev.evicted.vpn})`,
-                'replace'
-            );
+            const evictedFrame = document.getElementById(`frame-${ev.pfn}`);
+            if (evictedFrame) {
+                evictedFrame.classList.add('frame-evict');
+            }
+
+            setTimeout(() => {
             highlightFrame(ev.pfn, 'miss');
+            }, 300);
         } else if (ev.error) {
             logActivity(`Error: ${ev.error}`, 'error');
         }
@@ -878,11 +955,20 @@
     // --- Visualization ---
     function highlightFrame(pfn, type) {
         const frameElement = document.getElementById(`frame-${pfn}`);
-        if (frameElement) {
-            frameElement.classList.add(`animate-pulse-${type}`);
-            setTimeout(() => frameElement.classList.remove(`animate-pulse-${type}`), 1200);
+        if (!frameElement) return;
+
+        frameElement.classList.add(`animate-pulse-${type}`);
+
+        if (type === 'miss') {
+            frameElement.classList.add('frame-fault');
         }
+
+        setTimeout(() => {
+            frameElement.classList.remove(`animate-pulse-${type}`);
+            frameElement.classList.remove('frame-fault');
+        }, 1200);
     }
+
 
     function updateMemoryVisualization() {
         const container = document.getElementById('physicalMemory');
@@ -927,6 +1013,14 @@
             }
             
             container.appendChild(frameDiv);
+
+            // 🔥 Animate when frame becomes filled
+            if (frame.isFilled) {
+                requestAnimationFrame(() => {
+                    frameDiv.classList.add('frame-animate-load');
+                });
+            }
+;
         });
     }
 
@@ -979,7 +1073,7 @@
                 : '<span class="badge badge-not-present">Not Present</span>';
 
             tableHTML += `
-                <tr class="page-table-row" style="border-bottom: 1px solid hsl(222 30% 18%);">
+                <tr class="page-table-row ${entry.present ? 'page-table-active' : ''}" style="border-bottom: 1px solid hsl(222 30% 18%);">
                     <td class="px-4 py-3 font-mono text-sm">${entry.vpn}</td>
                     <td class="px-4 py-3 font-mono text-sm">${pfnCell}</td>
                     <td class="px-4 py-3 text-sm">${statusBadge}</td>
